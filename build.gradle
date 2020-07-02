@@ -1,0 +1,39 @@
+apply plugin : 'java'
+apply plugin : 'maven-publish'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    // Lombok annotation processor
+	compileOnly 'org.projectlombok:lombok:1.18.10'
+	annotationProcessor 'org.projectlombok:lombok:1.18.10'
+    
+    //JSON library for openapi doclet 
+    compile group: 'com.google.code.gson', name: 'gson', version: '2.8.6'
+    
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter', version: '5.6.2'
+    testCompile group: 'org.glassfish.jersey.core', name: 'jersey-server', version: '2.30'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'io.github.newlunarfire'
+            artifactId = 'openapi-doclet'
+            version = '0.1-SNAPSHOT'
+
+            from components.java
+        }
+    } 
+}
+    
+compileJava.options.encoding = 'UTF-8'
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
