@@ -3,8 +3,7 @@ package io.github.newlunarfire.openapi.defs;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.lang.model.type.TypeMirror;
-
+import io.github.newlunarfire.openapi.defs.type.TypeDefinition;
 import lombok.Data;
 
 @Data
@@ -16,10 +15,10 @@ public class MethodDefinition {
 	private String path;
 	private String body;
 	private String blockTags;
-	private Map<String, TypeMirror> pathParameters = new HashMap<String, TypeMirror>();
+	private Map<String, TypeDefinition> pathParameters = new HashMap<String, TypeDefinition>();
 	private Map<String, String> pathParameterDescriptions = new HashMap<String, String>();
-	private Class<?> returnType;
-	private TypeMirror requestBody;
+	private TypeDefinition returnType;
+	private TypeDefinition requestBody;
 	
 	public void setProduces(String produces) {
 		this.produces = produces.replace("\"", "");
@@ -29,7 +28,7 @@ public class MethodDefinition {
 		this.consumes = consumes.replace("\"", "");
 	}
 	
-	public void addPathParameter(String name, TypeMirror type) {
+	public void addPathParameter(String name, TypeDefinition type) {
 		pathParameters.put(name, type);
 	}
 	

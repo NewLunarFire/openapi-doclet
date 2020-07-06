@@ -2,16 +2,7 @@ package io.github.newlunarfire.openapi.output;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
-
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.SimpleTypeVisitor9;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -24,6 +15,11 @@ import com.google.gson.JsonSyntaxException;
 import io.github.newlunarfire.openapi.defs.APIDefinition;
 import io.github.newlunarfire.openapi.defs.MethodDefinition;
 import io.github.newlunarfire.openapi.defs.ResourceDefinition;
+import io.github.newlunarfire.openapi.defs.type.ClassDefinition;
+import io.github.newlunarfire.openapi.defs.type.EnumDefinition;
+import io.github.newlunarfire.openapi.defs.type.ListDefinition;
+import io.github.newlunarfire.openapi.defs.type.PrimitiveDefinition;
+import io.github.newlunarfire.openapi.defs.type.TypeDefinition;
 
 public class JsonOutputFormatter {
 	private static Gson gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
@@ -52,7 +48,10 @@ public class JsonOutputFormatter {
 				JsonObject pathObj = paths.get(path).getAsJsonObject();
 				JsonObject pathVerbObj = new JsonObject();
 				
-				pathVerbObj.addProperty("description", mdef.getBody());
+				if(mdef.getBody() != null) {
+					pathVerbObj.addProperty("description", mdef.getBody());
+				}
+				
 				pathVerbObj.add("parameters", getParameters(mdef));
 				
 				if("POST".equals(mdef.getVerb())) {
@@ -95,6 +94,7 @@ public class JsonOutputFormatter {
 			parameter.addProperty("name", parameterName);
 			parameter.addProperty("in", "path");
 			parameter.addProperty("required", true);
+			
 			parameter.add("schema", extractSchema(mdef.getPathParameters().get(parameterName)));
 			
 			String description = mdef.getParameterDescription(parameterName);
@@ -141,92 +141,97 @@ public class JsonOutputFormatter {
 		return root;
 	}
 	
-	private JsonObject primitiveToSchema(String type) {
-		JsonObject schema = new JsonObject();
-		switch(type) {
+	private JsonElement extractSchema(TypeDefinition type) {
+		JsonObject obj = null;
+		
+		// TODO: Use visitor pattern here instead
+		if(type instanceof ClassDefinition) {
+			obj = extractSchemaFromClass((ClassDefinition) type);
+		} else if(type instanceof EnumDefinition) {
+			obj = extractSchemaFromEnum((EnumDefinition) type);
+		} else if(type instanceof ListDefinition) {
+			obj = extractSchemaFromList((ListDefinition) type);
+		} else if(type instanceof PrimitiveDefinition) {
+			obj = extractSchemaFromPrimitive((PrimitiveDefinition) type);
+		} else {
+			return JsonNull.INSTANCE;
+		}
+		
+		if(type.getDescription() != null) {
+			obj.addProperty("description", type.getDescription());
+		}
+		
+		return obj;
+	}
+	
+	private JsonObject extractSchemaFromClass(ClassDefinition clazz) {
+		JsonObject root = new JsonObject();
+		JsonObject properties = new JsonObject();
+		
+		root.addProperty("type", "object");
+		if(clazz.getDescription() != null) {
+			root.addProperty("description", clazz.getDescription());
+		}
+		
+		for(var child: clazz.getChildren().entrySet()) {
+			properties.add(child.getKey(), extractSchema(child.getValue()));
+		}
+		
+		root.add("properties", properties);
+		return root;
+	}
+	
+	private JsonObject extractSchemaFromEnum(EnumDefinition enu) {
+		JsonObject root = new JsonObject();
+		JsonArray constants = new JsonArray();
+		
+		root.addProperty("type", "string");
+		
+		if(enu.getDescription() != null) {
+			root.addProperty("description", enu.getDescription());
+		}
+		
+		for(String key: enu.getValues().keySet()) {
+			constants.add(key);
+		}
+		
+		root.add("enum", constants);
+		return root;
+	}
+	
+	private JsonObject extractSchemaFromList(ListDefinition list) {
+		JsonObject root = new JsonObject();
+		
+		root.addProperty("type", "array");
+		if(list.getDescription() != null) {
+			root.addProperty("description", list.getDescription());
+		}
+		
+		root.add("items", extractSchema(list.getSubType()));
+		return root;
+	}
+	
+	private JsonObject extractSchemaFromPrimitive(PrimitiveDefinition primitive) {
+		JsonObject root = new JsonObject();
+		switch(primitive.getType()) {
 			case "byte":
 			case "short":
 			case "int":
 			case "long":
-				schema.addProperty("type", "integer");
+				root.addProperty("type", "integer");
 				break;
 			case "boolean":
-				schema.addProperty("type", "boolean");
+				root.addProperty("type", "boolean");
 				break;
 			case "float":
 			case "double":
-				schema.addProperty("type", "number");
+				root.addProperty("type", "number");
 				break;
 			case "char":
-				schema.addProperty("type", "string");
-				schema.addProperty("maxLength", 1);
+				root.addProperty("maxLength", 1);
+			case "string":
+				root.addProperty("type", "string");
 				break;
-		}
-		
-		return schema;
-	}
-	
-	private JsonElement extractSchema(TypeMirror t) {
-		return t.accept(new SimpleTypeVisitor9<JsonElement, Void>(JsonNull.INSTANCE) {
-			@Override
-			public JsonElement visitDeclared(DeclaredType t, Void p) {
-		 		try {
-					return extractSchema(getClass().getClassLoader().loadClass(t.toString()));
-				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
-				}
-		 		
-		 		return JsonNull.INSTANCE;
-		 	}
-		 	
-			@Override
-			public JsonElement visitPrimitive(PrimitiveType t, Void p) {
-				return primitiveToSchema(t.toString());
-		 	}
-		}, null);
-	}
-	
-	private JsonElement extractSchema(Type t) {
-		Class<?> c;
-		JsonObject root = new JsonObject();
-		
-		if(t instanceof ParameterizedType) {
-			c = (Class<?>) ((ParameterizedType) t).getRawType();
-		} else if (t instanceof Class){
-			c = (Class<?>) t;
-		} else {
-			return JsonNull.INSTANCE;
-		}
-
- 		if(c.isPrimitive()) {
- 			return primitiveToSchema(c.getSimpleName());
-		} else if(String.class.equals(c)) {
-			root.addProperty("type", "string");
-		} else if(List.class.equals(c)) {
-			root.addProperty("type", "array");
-			root.add("items", extractSchema(((ParameterizedType) t).getActualTypeArguments()[0]));
-		} else if(c.isEnum()) {
-			root.addProperty("type", "string");
-			JsonArray enumConstants = new JsonArray();
-			List.of(c.getEnumConstants()).stream()
-				.map(Object::toString)
-				.forEach(enumConstants::add);
-
-			root.add("enum", enumConstants);
-		} else {
-			// POJO 
-			JsonObject properties = new JsonObject();
-			
-			Arrays.stream(c.getMethods())
-				.filter(_m -> _m.getName().startsWith("get") && !_m.getName().equals("getClass"))
-				.forEach(_m -> {
-					String name = _m.getName().substring(3);
-					name = name.substring(0,1).toLowerCase() + name.substring(1);
-					properties.add(name, extractSchema(_m.getGenericReturnType()));
-				});
-				
-			root.addProperty("type", "object");
-			root.add("properties", properties);
 		}
 		
 		return root;
