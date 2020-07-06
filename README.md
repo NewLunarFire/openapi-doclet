@@ -17,6 +17,13 @@ This project uses semantic versioning. It is still at version 0, meaning breakin
 You can add the following Gradle task to your `build.gradle` file:
 
 ```groovy
+repositories {
+    ...
+    maven {
+		url  "https://tommysavaria.bintray.com/openapi-doclet"
+	}
+}
+
 configurations {
     openapi
 }
@@ -33,8 +40,9 @@ task generateDoc(type: Javadoc) {
 	source sourceSets.main.allJava
 	classpath = sourceSets.main.compileClasspath
 	options.addStringOption("apiVersion", rootProject.version)
-	options.addStringOption("apiServers", '[{"url":"http://api.example.com/","decription":"You API Server "}]')
-	options.docTitle = "Your API "
+	options.addStringOption("apiServers", '[{"url":"http://api.example.com/","description":"You API Server "}]')
+	options.addStringOption("apiPackages", "com.myapi.resources:com.anotherapi.resources")
+	options.docTitle = "Your API"
 	options.docletpath = sourceSets.main.output.classesDirs.asType(List)
 	options.docletpath += new File(configurations.openapi.asPath)
 	options.doclet = "io.github.newlunarfire.openapi.OpenAPIDoclet"
@@ -46,19 +54,21 @@ task generateDoc(type: Javadoc) {
 This rather lengthy task description contains all the necessary flags to successfully invoke the doclet. Here are the important customizable parts: 
 * `apiVersion` should be your api version. It should be in the `rootProject.version` variable, bit if it is not you may change this line. 
 * `apiServers` is a JSON array containing you servers descriptions, as specified by the OpenAPI specification on Server Objects: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#serverObject
+* `apiPackages` is a list of colon-separated fully-qualified package names to scan for API resources. The tool will scan all the classes in those packages for API endpoints.
 * `docTitle` is the title of the openAPI document. You should name this with your API name.
 
 ❗ I wish to someday distribute this as a simple plug-and-play Gradle task, as well as a Maven (and possibly Ant) task, so any help is welcome.
 
 ## Command-Line options
 
-| Flag         | Title                | Description                                         |
-|--------------|----------------------|-----------------------------------------------------|
-| -d           | Output Directory     | Path to output the file to                          |
-| -doctitle    | Document Title       | Title of the document                               |
-| -apiVersion  | API Version          | Version Number of your API                          |
-| -apiServers  | API Servers          | Servers for your API                                |
-| -windowtitle | UNUSED: Window Title | Provided for compatibility with Gradle Javadoc task |
+| Flag          | Title                | Description                                         |
+|---------------|----------------------|-----------------------------------------------------|
+| -d            | Output Directory     | Path to output the file to                          |
+| -doctitle     | Document Title       | Title of the document                               |
+| -apiVersion   | API Version          | Version Number of your API                          |
+| -apiServers   | API Servers          | Servers for your API                                |
+| -apiPackages  | API Packages         | Packages to scan for API endpoints                  |
+| -windowtitle  | UNUSED: Window Title | Provided for compatibility with Gradle Javadoc task |
 
 ## Contributing
 
