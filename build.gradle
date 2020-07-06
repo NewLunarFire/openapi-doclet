@@ -8,6 +8,8 @@ repositories {
     jcenter()
 }
 
+rootProject.version = '0.0.0'
+
 dependencies {
     // Lombok annotation processor
 	compileOnly 'org.projectlombok:lombok:1.18.10'
@@ -20,12 +22,23 @@ dependencies {
     testCompile group: 'org.glassfish.jersey.core', name: 'jersey-server', version: '2.30'
 }
 
+
 publishing {
+	repositories {
+		maven {
+	        url = System.getProperty('maven.url') 
+	        credentials {
+	            username = System.getProperty('maven.username')
+	            password = System.getProperty('maven.password')
+	        }
+	    }
+	}
+	
     publications {
         maven(MavenPublication) {
             groupId = 'io.github.newlunarfire'
             artifactId = 'openapi-doclet'
-            version = '0.1-SNAPSHOT'
+            version = rootProject.version
 
             from components.java
         }
